@@ -1,0 +1,2 @@
+# SmartLoanEvaluator
+project for CASCA
