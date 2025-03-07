@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Loan Evaluator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .drop-zone {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover {
+            border-color: #4a5568;
+            background-color: #f7fafc;
+        }
+        .drop-zone.dragover {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <h1 class="text-3xl font-bold text-gray-900">
+                    Smart Loan Evaluator 🏦
+                </h1>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="flex-grow container mx-auto px-4 py-8">
+            <div class="max-w-3xl mx-auto">
+                <!-- Introduction -->
+                <div class="bg-white rounded-lg shadow p-6 mb-8">
+                    <h2 class="text-xl font-semibold mb-4">Welcome to Smart Loan Evaluator</h2>
+                    <p class="text-gray-600 mb-4">
+                        Upload a bank statement PDF to get an instant analysis of the applicant's financial health
+                        and loan worthiness. Our AI-powered system will:
+                    </p>
+                    <ul class="list-disc list-inside text-gray-600 space-y-2">
+                        <li>Analyze transaction patterns</li>
+                        <li>Calculate key financial metrics</li>
+                        <li>Identify regular expenses and income</li>
+                        <li>Evaluate loan worthiness</li>
+                        <li>Generate comprehensive reports</li>
+                    </ul>
+                </div>
+
+                <!-- Upload form -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data"
+                          class="space-y-6">
+                        <div class="drop-zone p-8 text-center rounded-lg cursor-pointer"
+                             id="dropZone">
+                            <div class="space-y-4">
+                                <div class="flex justify-center">
+                                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                    </svg>
+                                </div>
+                                <div class="text-gray-600">
+                                    <label for="file" class="cursor-pointer">
+                                        <span class="text-blue-500 hover:text-blue-600">Choose a file</span>
+                                        or drag it here
+                                    </label>
+                                    <input type="file" id="file" name="file" accept=".pdf"
+                                           class="hidden" required>
+                                </div>
+                                <p class="text-sm text-gray-500">PDF files only, max 16MB</p>
+                            </div>
+                        </div>
+                        <div id="fileInfo" class="hidden">
+                            <p class="text-sm text-gray-600">Selected file: <span id="fileName"></span></p>
+                        </div>
+                        <div class="flex justify-center">
+                            <button type="submit"
+                                    class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition duration-300">
+                                Analyze Statement
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t mt-8">
+            <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+                <p class="text-center text-gray-500 text-sm">
+                    © 2024 Smart Loan Evaluator. All rights reserved.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('file');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+
+        // Handle drag and drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
+            updateFileInfo();
+        }
+
+        fileInput.addEventListener('change', updateFileInfo);
+
+        function updateFileInfo() {
+            if (fileInput.files.length > 0) {
+                fileInfo.classList.remove('hidden');
+                fileName.textContent = fileInput.files[0].name;
+            } else {
+                fileInfo.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extracted Table</title>
+</head>
+<body>
+    <h2>Extracted Table</h2>
+    <table border="1">
+        {% for row in table %}
+        <tr>
+            {% for col in row %}
+            <td>{{ col }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/">Upload another file</a>
+</body>
+</html>

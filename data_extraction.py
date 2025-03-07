@@ -1,37 +1,110 @@
 import pandas as pd
-import pdfplumber
-import re
+import tabula
+import os
+from datetime import datetime
 
 def extract_transactions_from_pdf(pdf_path):
-    transactions = []
-    account_holder = "Unknown"
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if "Mr." in text or "Mrs." in text:
-                account_holder_match = re.search(r'(Mr\.|Mrs\.)\s+(.*?)\n', text)
-                if account_holder_match:
-                    account_holder = account_holder_match.group(2).strip()
-            
-            lines = text.split('\n')
-            for line in lines:
-                match = re.search(r'(\d{2}-[A-Za-z]{3}-\d{4})\s+(\d{2}-[A-Za-z]{3}-\d{4})\s+(.*?)\s+(\d{6}|null)?\s*(-?\d+,?\d*\.\d{2})?\s*(-?\d+,?\d*\.\d{2})?\s*(-?\d+,?\d*\.\d{2})?', line)
-                if match:
-                    transaction_date, value_date, particulars, cheque_no, debit, credit, balance = match.groups()
-                    transactions.append([
-                        transaction_date, value_date, particulars, cheque_no if cheque_no else "N/A",
-                        float(debit.replace(",", "")) if debit else 0.0,
-                        float(credit.replace(",", "")) if credit else 0.0,
-                        float(balance.replace(",", "")) if balance else 0.0
-                    ])
+    """
+    Extract transaction data from PDF bank statements.
+    Returns a pandas DataFrame with standardized transaction data.
+    """
+    try:
+        # Extract all tables from PDF
+        tables = tabula.read_pdf(pdf_path, pages='all', encoding='ISO-8859-1')
+        
+        # Combine all tables into one DataFrame
+        combined_df = pd.concat(tables, ignore_index=True)
+        
+        # Clean and standardize column names
+        combined_df.columns = [col.strip().lower().replace(' ', '_') for col in combined_df.columns]
+        
+        # Try to identify date, description, and amount columns
+        date_col = next((col for col in combined_df.columns if 'date' in col), None)
+        desc_col = next((col for col in combined_df.columns if any(x in col for x in ['desc', 'narr', 'part'])), None)
+        debit_col = next((col for col in combined_df.columns if any(x in col for x in ['debit', 'withdrawal'])), None)
+        credit_col = next((col for col in combined_df.columns if any(x in col for x in ['credit', 'deposit'])), None)
+        
+        if not all([date_col, desc_col]):
+            raise ValueError("Could not identify required columns in the statement")
+        
+        # Create standardized DataFrame
+        transactions = pd.DataFrame()
+        transactions['date'] = pd.to_datetime(combined_df[date_col], errors='coerce')
+        transactions['description'] = combined_df[desc_col]
+        
+        # Handle amounts
+        if debit_col and credit_col:
+            transactions['amount'] = combined_df[credit_col].fillna(0) - combined_df[debit_col].fillna(0)
+        elif debit_col:
+            transactions['amount'] = -combined_df[debit_col].fillna(0)
+        elif credit_col:
+            transactions['amount'] = combined_df[credit_col].fillna(0)
+        
+        # Clean up
+        transactions = transactions.dropna(subset=['date', 'amount'])
+        transactions = transactions.sort_values('date')
+        
+        return transactions
     
-    df = pd.DataFrame(transactions, columns=["Transaction Date", "Value Date", "Particulars", "Cheque No", "Debit", "Credit", "Balance"])
-    return account_holder, df
+    except Exception as e:
+        print(f"Error extracting transactions: {str(e)}")
+        return None
 
-if __name__ == "__main__":
-    pdf_path = "example_bank_statement.pdf"  # Change this
-    account_holder, df_pdf = extract_transactions_from_pdf(pdf_path)
+def categorize_transaction(description):
+    """
+    Basic transaction categorization based on keywords.
+    """
+    description = description.lower()
     
-    print(f"Account Holder: {account_holder}\n")
-    print("Extracted Transactions:")
-    print(df_pdf.head())
+    categories = {
+        'salary': ['salary', 'payroll', 'wage'],
+        'rent': ['rent', 'lease'],
+        'utilities': ['electric', 'water', 'gas', 'internet', 'phone'],
+        'loan_payment': ['loan', 'mortgage', 'emi'],
+        'employee_expenses': ['payroll', 'salary expense'],
+        'supplies': ['supplies', 'inventory', 'stock'],
+        'insurance': ['insurance', 'coverage'],
+        'tax': ['tax', 'gst', 'vat'],
+        'other': []
+    }
+    
+    for category, keywords in categories.items():
+        if any(keyword in description for keyword in keywords):
+            return category
+    
+    return 'other'
+
+def analyze_statement(transactions_df):
+    """
+    Analyze transactions to extract key financial metrics.
+    """
+    if transactions_df is None or transactions_df.empty:
+        return None
+        
+    analysis = {
+        'total_deposits': transactions_df[transactions_df['amount'] > 0]['amount'].sum(),
+        'total_withdrawals': abs(transactions_df[transactions_df['amount'] < 0]['amount'].sum()),
+        'average_balance': transactions_df['amount'].mean(),
+        'transaction_count': len(transactions_df),
+        'date_range': {
+            'start': transactions_df['date'].min().strftime('%Y-%m-%d'),
+            'end': transactions_df['date'].max().strftime('%Y-%m-%d')
+        }
+    }
+    
+    # Categorize transactions
+    transactions_df['category'] = transactions_df['description'].apply(categorize_transaction)
+    
+    # Category-wise analysis
+    category_analysis = {}
+    for category in transactions_df['category'].unique():
+        cat_df = transactions_df[transactions_df['category'] == category]
+        category_analysis[category] = {
+            'total': cat_df['amount'].sum(),
+            'count': len(cat_df),
+            'average': cat_df['amount'].mean()
+        }
+    
+    analysis['category_analysis'] = category_analysis
+    
+    return analysis 
